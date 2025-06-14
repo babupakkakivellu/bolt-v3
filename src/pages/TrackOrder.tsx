@@ -19,6 +19,10 @@ interface Order {
   files: Array<{ name: string; size: number; type: string; path?: string }>;
   totalCost: number;
   printSide: string;
+  selectedPages?: string;
+  colorPages?: string;
+  bwPages?: string;
+  bindingColorType?: string;
 }
 
 const TrackOrder = () => {
@@ -92,6 +96,19 @@ const TrackOrder = () => {
     switch (type) {
       case 'blackAndWhite': return 'Black & White';
       case 'color': return 'Color';
+      case 'custom': return 'Custom (Mixed)';
+      case 'softBinding': return 'Soft Binding';
+      case 'spiralBinding': return 'Spiral Binding';
+      case 'customPrint': return 'Custom Print';
+      default: return type;
+    }
+  };
+
+  const getBindingColorTypeName = (type: string) => {
+    switch (type) {
+      case 'blackAndWhite': return 'Black & White';
+      case 'color': return 'Color';
+      case 'custom': return 'Custom (Mixed)';
       default: return type;
     }
   };
@@ -178,13 +195,45 @@ const TrackOrder = () => {
                       <h4 className="font-medium text-gray-900 mb-3">Print Details</h4>
                       <div className="space-y-2 text-sm">
                         <p><span className="font-medium">Print Type:</span> {getPrintTypeName(order.printType)}</p>
-                        <p><span className="font-medium">Print Side:</span> {order.printSide === 'double' ? 'Double Sided' : 'Single Sided'}</p>
-                        <p><span className="font-medium">Copies:</span> {order.copies}</p>
-                        <p><span className="font-medium">Paper Size:</span> {order.paperSize.toUpperCase()}</p>
-                        <p><span className="font-medium">Total Cost:</span> ₹{order.totalCost?.toFixed(2) || '0.00'}</p>
+                        
+                        {/* Show binding color type for binding orders */}
+                        {(order.printType === 'softBinding' || order.printType === 'spiralBinding') && order.bindingColorType && (
+                          <p><span className="font-medium">Binding Color Type:</span> {getBindingColorTypeName(order.bindingColorType)}</p>
+                        )}
+                        
+                        {/* Only show these details for non-custom print orders */}
+                        {order.printType !== 'customPrint' && (
+                          <>
+                            <p><span className="font-medium">Print Side:</span> {order.printSide === 'double' ? 'Double Sided' : 'Single Sided'}</p>
+                            <p><span className="font-medium">Copies:</span> {order.copies}</p>
+                            <p><span className="font-medium">Paper Size:</span> {order.paperSize?.toUpperCase()}</p>
+                          </>
+                        )}
+                        
+                        <p><span className="font-medium">Total Cost:</span> {
+                          order.printType === 'customPrint' ? 'Quote Required' : `₹${order.totalCost?.toFixed(2) || '0.00'}`
+                        }</p>
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Show page details for applicable order types */}
+                  {order.printType !== 'customPrint' && (
+                    <div className="mt-4 pt-4 border-t">
+                      <h4 className="font-medium text-gray-900 mb-2">Page Details</h4>
+                      <div className="text-sm text-gray-600">
+                        {order.printType === 'custom' || (order.bindingColorType === 'custom') ? (
+                          <>
+                            {order.colorPages && <p><span className="font-medium">Color Pages:</span> {order.colorPages}</p>}
+                            {order.bwPages && <p><span className="font-medium">B&W Pages:</span> {order.bwPages}</p>}
+                          </>
+                        ) : (
+                          order.selectedPages && <p><span className="font-medium">Selected Pages:</span> {order.selectedPages}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   {order.specialInstructions && (
                     <div className="mt-4 pt-4 border-t">
                       <h4 className="font-medium text-gray-900 mb-2">Special Instructions</h4>

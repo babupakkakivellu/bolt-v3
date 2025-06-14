@@ -37,6 +37,7 @@ type Order = {
   selectedPages?: string;
   colorPages?: string;
   bwPages?: string;
+  bindingColorType?: string;
 };
 
 const OrdersList = () => {
@@ -113,12 +114,22 @@ const OrdersList = () => {
       case 'custom': return 'Custom (Mixed)';
       case 'softBinding': return 'Soft Binding';
       case 'spiralBinding': return 'Spiral Binding';
+      case 'customPrint': return 'Custom Print';
+      default: return type;
+    }
+  };
+
+  const getBindingColorTypeName = (type: string) => {
+    switch (type) {
+      case 'blackAndWhite': return 'Black & White';
+      case 'color': return 'Color';
+      case 'custom': return 'Custom (Mixed)';
       default: return type;
     }
   };
   
   const getPaperSizeName = (size: string) => {
-    return size.toUpperCase();
+    return size?.toUpperCase() || 'N/A';
   };
 
   const handleFileDownload = (file: OrderFile) => {
@@ -223,8 +234,10 @@ const OrdersList = () => {
                     <TableCell>{order.fullName}</TableCell>
                     <TableCell>{formatDate(order.orderDate)}</TableCell>
                     <TableCell>{getPrintTypeName(order.printType)}</TableCell>
-                    <TableCell>{order.copies}</TableCell>
-                    <TableCell>₹{order.totalCost?.toFixed(2) || '0.00'}</TableCell>
+                    <TableCell>{order.copies || 'N/A'}</TableCell>
+                    <TableCell>
+                      {order.printType === 'customPrint' ? 'Quote Required' : `₹${order.totalCost?.toFixed(2) || '0.00'}`}
+                    </TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
                     <TableCell>
                       <Button 
@@ -356,6 +369,16 @@ const OrdersList = () => {
                     <div>
                       <p className="text-sm text-gray-500">Print Type</p>
                       <p>{getPrintTypeName(selectedOrder.printType)}</p>
+                      
+                      {/* Show binding color type for binding orders */}
+                      {(selectedOrder.printType === 'softBinding' || selectedOrder.printType === 'spiralBinding') && selectedOrder.bindingColorType && (
+                        <>
+                          <p className="mt-2 text-sm text-gray-500">Binding Color Type</p>
+                          <p>{getBindingColorTypeName(selectedOrder.bindingColorType)}</p>
+                        </>
+                      )}
+                      
+                      {/* Show custom print details */}
                       {selectedOrder.printType === 'custom' && (
                         <>
                           <p className="mt-2 text-sm text-gray-500">Color Pages</p>
@@ -364,7 +387,19 @@ const OrdersList = () => {
                           <p>{selectedOrder.bwPages || 'None'}</p>
                         </>
                       )}
-                      {selectedOrder.printType !== 'custom' && selectedOrder.selectedPages && (
+                      
+                      {/* Show binding custom details */}
+                      {(selectedOrder.printType === 'softBinding' || selectedOrder.printType === 'spiralBinding') && selectedOrder.bindingColorType === 'custom' && (
+                        <>
+                          <p className="mt-2 text-sm text-gray-500">Color Pages (Binding)</p>
+                          <p>{selectedOrder.colorPages || 'None'}</p>
+                          <p className="mt-2 text-sm text-gray-500">B&W Pages (Binding)</p>
+                          <p>{selectedOrder.bwPages || 'None'}</p>
+                        </>
+                      )}
+                      
+                      {/* Show selected pages for non-custom orders */}
+                      {selectedOrder.printType !== 'custom' && selectedOrder.printType !== 'customPrint' && selectedOrder.selectedPages && (
                         <>
                           <p className="mt-2 text-sm text-gray-500">Selected Pages</p>
                           <p>{selectedOrder.selectedPages}</p>
@@ -372,14 +407,20 @@ const OrdersList = () => {
                       )}
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Print Side</p>
-                      <p>{selectedOrder.printSide === 'double' ? 'Double Sided' : 'Single Sided'}</p>
-                      <p className="mt-2 text-sm text-gray-500">Paper Size</p>
-                      <p>{getPaperSizeName(selectedOrder.paperSize)}</p>
-                      <p className="mt-2 text-sm text-gray-500">Copies</p>
-                      <p>{selectedOrder.copies}</p>
+                      {selectedOrder.printType !== 'customPrint' && (
+                        <>
+                          <p className="text-sm text-gray-500">Print Side</p>
+                          <p>{selectedOrder.printSide === 'double' ? 'Double Sided' : 'Single Sided'}</p>
+                          <p className="mt-2 text-sm text-gray-500">Paper Size</p>
+                          <p>{getPaperSizeName(selectedOrder.paperSize)}</p>
+                          <p className="mt-2 text-sm text-gray-500">Copies</p>
+                          <p>{selectedOrder.copies}</p>
+                        </>
+                      )}
                       <p className="mt-2 text-sm text-gray-500">Total Cost</p>
-                      <p className="font-semibold">₹{selectedOrder.totalCost?.toFixed(2) || '0.00'}</p>
+                      <p className="font-semibold">
+                        {selectedOrder.printType === 'customPrint' ? 'Quote Required' : `₹${selectedOrder.totalCost?.toFixed(2) || '0.00'}`}
+                      </p>
                     </div>
                   </div>
                 </div>

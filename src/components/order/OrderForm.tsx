@@ -31,10 +31,10 @@ const orderSchema = z.object({
   phoneNumber: z.string().min(10, { message: "Please enter a valid phone number." }),
   printType: z.string(),
   bindingColorType: z.string().optional(),
-  copies: z.coerce.number().min(1),
-  paperSize: z.string(),
-  printSide: z.string(),
-  selectedPages: z.string(),
+  copies: z.coerce.number().min(1).optional(),
+  paperSize: z.string().optional(),
+  printSide: z.string().optional(),
+  selectedPages: z.string().optional(),
   colorPages: z.string().optional(),
   bwPages: z.string().optional(),
   specialInstructions: z.string().optional(),
@@ -53,6 +53,7 @@ const OrderForm = () => {
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
   const [isCustomPrint, setIsCustomPrint] = useState(false);
   const [isBindingType, setIsBindingType] = useState(false);
+  const [isCustomPrintType, setIsCustomPrintType] = useState(false);
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
@@ -112,6 +113,12 @@ const OrderForm = () => {
   };
 
   const calculateCost = (values: OrderFormValues) => {
+    // Custom print type doesn't need cost calculation
+    if (values.printType === 'customPrint') {
+      setCalculatedCost(0);
+      return 0;
+    }
+
     const isDoubleSided = values.printSide === 'double';
     const copies = values.copies || 1;
     const printType = values.printType;
@@ -214,7 +221,7 @@ const OrderForm = () => {
       }
     } else if (printType === 'softBinding' || printType === 'spiralBinding') {
       // For binding types, calculate based on binding color type
-      let pagesCount = calculateSelectedPagesCount(values.selectedPages, totalPages);
+      let pagesCount = calculateSelectedPagesCount(values.selectedPages || 'all', totalPages);
       let costPerPage;
       
       if (bindingColorType === 'color') {
@@ -239,7 +246,7 @@ const OrderForm = () => {
     } else {
       // Regular printing (blackAndWhite or color)
       const isColor = values.printType === 'color';
-      let pagesCount = calculateSelectedPagesCount(values.selectedPages, totalPages);
+      let pagesCount = calculateSelectedPagesCount(values.selectedPages || 'all', totalPages);
       
       let costPerPage;
       if (isColor) {
@@ -322,6 +329,40 @@ const OrderForm = () => {
       return;
     }
 
+    // For custom print type, only validate required fields
+    if (data.printType === 'customPrint') {
+      const orderData = {
+        ...data,
+        files: files.map(file => ({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          path: `/uploads/${file.name}`,
+        })),
+        orderId: `ORD-${Date.now()}`,
+        orderDate: new Date().toISOString(),
+        status: "pending",
+        totalCost: 0, // No cost calculation for custom print
+        copies: 1, // Default value
+        paperSize: 'a4', // Default value
+        printSide: 'single', // Default value
+        selectedPages: 'all', // Default value
+      };
+
+      const existingOrders = JSON.parse(localStorage.getItem('xeroxOrders') || '[]');
+      localStorage.setItem('xeroxOrders', JSON.stringify([...existingOrders, orderData]));
+
+      setSubmittedOrderId(orderData.orderId);
+      setOrderSubmitted(true);
+
+      showToast({
+        title: "Order submitted successfully!",
+        description: `Your order ID is ${orderData.orderId}`,
+      });
+      return;
+    }
+
+    // Regular validation for other print types
     if (data.printType === 'custom' || (isBindingType && data.bindingColorType === 'custom')) {
       if (!data.colorPages && !data.bwPages) {
         showToast({
@@ -331,7 +372,7 @@ const OrderForm = () => {
         });
         return;
       }
-    } else if (!validatePageSelection(data.selectedPages, totalPages)) {
+    } else if (!validatePageSelection(data.selectedPages || 'all', totalPages)) {
       showToast({
         title: "Invalid page selection",
         description: "Please check your page selection.",
@@ -375,13 +416,14 @@ const OrderForm = () => {
     setFilePreviewUrls([]);
     setIsCustomPrint(false);
     setIsBindingType(false);
+    setIsCustomPrintType(false);
     form.reset();
   };
 
   // Watch form values for cost calculation
   useEffect(() => {
     const subscription = form.watch((value) => {
-      if (totalPages > 0) {
+      if (totalPages > 0 && value.printType !== 'customPrint') {
         calculateCost(value as OrderFormValues);
       }
     });
@@ -395,6 +437,7 @@ const OrderForm = () => {
         const printType = value.printType;
         setIsCustomPrint(printType === 'custom');
         setIsBindingType(printType === 'softBinding' || printType === 'spiralBinding');
+        setIsCustomPrintType(printType === 'customPrint');
         
         // Reset color/bw pages when switching print types
         if (printType !== 'custom') {
@@ -562,6 +605,7 @@ const OrderForm = () => {
                         field.onChange(value);
                         setIsCustomPrint(value === 'custom');
                         setIsBindingType(value === 'softBinding' || value === 'spiralBinding');
+                        setIsCustomPrintType(value === 'customPrint');
                       }} 
                       defaultValue={field.value}
                     >
@@ -576,6 +620,7 @@ const OrderForm = () => {
                         <SelectItem value="custom">Custom (Mix Color & B/W)</SelectItem>
                         <SelectItem value="softBinding">Soft Binding</SelectItem>
                         <SelectItem value="spiralBinding">Spiral Binding</SelectItem>
+                        <SelectItem value="customPrint">Custom Print (Quote Required)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -614,136 +659,30 @@ const OrderForm = () => {
                   )}
                 />
               )}
-              
-              <FormField
-                control={form.control}
-                name="printSide"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Print Side</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select side" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="single">Single Side</SelectItem>
-                        <SelectItem value="double">Double Side</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="copies"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Number of Copies</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="1"
-                        {...field}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value);
-                          if (value > 0) {
-                            field.onChange(value);
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="paperSize"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Paper Size</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select size" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="a4">A4</SelectItem>
-                        <SelectItem value="a3">A3</SelectItem>
-                        <SelectItem value="letter">Letter</SelectItem>
-                        <SelectItem value="legal">Legal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {!isCustomPrint && (
-                <FormField
-                  control={form.control}
-                  name="selectedPages"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Page Selection</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g., 1-5, 8, 11-13 or 'all'" 
-                          {...field}
-                          disabled={totalPages === 0}
-                          onChange={(e) => {
-                            field.onChange(e.target.value);
-                            const newValues = form.getValues();
-                            newValues.selectedPages = e.target.value;
-                            calculateCost(newValues);
-                          }}
-                        />
-                      </FormControl>
-                      <p className="text-sm text-gray-500">
-                        {totalPages > 0 ? `Total pages: ${totalPages}` : 'Upload a file to select pages'}
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {isCustomPrint && (
+              {/* Only show these fields for non-custom print types */}
+              {!isCustomPrintType && (
                 <>
                   <FormField
                     control={form.control}
-                    name="colorPages"
+                    name="printSide"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Color Pages</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="e.g., 1-3, 5, 7-9" 
-                            {...field}
-                            disabled={totalPages === 0}
-                            onChange={(e) => {
-                              field.onChange(e.target.value);
-                              calculateCost(form.getValues());
-                            }}
-                          />
-                        </FormControl>
-                        <p className="text-sm text-gray-500">
-                          Specify pages to print in color
-                        </p>
+                        <FormLabel>Print Side</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select side" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="single">Single Side</SelectItem>
+                            <SelectItem value="double">Double Side</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -751,24 +690,23 @@ const OrderForm = () => {
                   
                   <FormField
                     control={form.control}
-                    name="bwPages"
+                    name="copies"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Black & White Pages</FormLabel>
+                        <FormLabel>Number of Copies</FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="e.g., 4, 6, 10-12" 
+                            type="number" 
+                            min="1"
                             {...field}
-                            disabled={totalPages === 0}
                             onChange={(e) => {
-                              field.onChange(e.target.value);
-                              calculateCost(form.getValues());
+                              const value = parseInt(e.target.value);
+                              if (value > 0) {
+                                field.onChange(value);
+                              }
                             }}
                           />
                         </FormControl>
-                        <p className="text-sm text-gray-500">
-                          Specify pages to print in black & white
-                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -776,6 +714,120 @@ const OrderForm = () => {
                 </>
               )}
             </div>
+
+            {!isCustomPrintType && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="paperSize"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Paper Size</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select size" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="a4">A4</SelectItem>
+                          <SelectItem value="a3">A3</SelectItem>
+                          <SelectItem value="letter">Letter</SelectItem>
+                          <SelectItem value="legal">Legal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {!isCustomPrint && (
+                  <FormField
+                    control={form.control}
+                    name="selectedPages"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Page Selection</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g., 1-5, 8, 11-13 or 'all'" 
+                            {...field}
+                            disabled={totalPages === 0}
+                            onChange={(e) => {
+                              field.onChange(e.target.value);
+                              const newValues = form.getValues();
+                              newValues.selectedPages = e.target.value;
+                              calculateCost(newValues);
+                            }}
+                          />
+                        </FormControl>
+                        <p className="text-sm text-gray-500">
+                          {totalPages > 0 ? `Total pages: ${totalPages}` : 'Upload a file to select pages'}
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {isCustomPrint && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="colorPages"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Color Pages</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g., 1-3, 5, 7-9" 
+                              {...field}
+                              disabled={totalPages === 0}
+                              onChange={(e) => {
+                                field.onChange(e.target.value);
+                                calculateCost(form.getValues());
+                              }}
+                            />
+                          </FormControl>
+                          <p className="text-sm text-gray-500">
+                            Specify pages to print in color
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="bwPages"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Black & White Pages</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g., 4, 6, 10-12" 
+                              {...field}
+                              disabled={totalPages === 0}
+                              onChange={(e) => {
+                                field.onChange(e.target.value);
+                                calculateCost(form.getValues());
+                              }}
+                            />
+                          </FormControl>
+                          <p className="text-sm text-gray-500">
+                            Specify pages to print in black & white
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+              </div>
+            )}
 
             <FormField
               control={form.control}
@@ -824,7 +876,8 @@ const OrderForm = () => {
             )}
           </div>
 
-          {calculatedCost > 0 && (
+          {/* Show cost calculation for all types except custom print */}
+          {calculatedCost > 0 && !isCustomPrintType && (
             <Card className="bg-xerox-50 border-xerox-200">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -866,11 +919,33 @@ const OrderForm = () => {
             </Card>
           )}
 
+          {/* Show quote required message for custom print */}
+          {isCustomPrintType && (
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-medium text-blue-900">Custom Print Order</h3>
+                  </div>
+                  <p className="text-xl font-bold text-blue-700">
+                    Quote Required
+                  </p>
+                </div>
+                <div className="mt-2 text-sm text-blue-600">
+                  <p>• Our team will review your files and provide a custom quote</p>
+                  <p>• We'll contact you within 10 minutes with pricing details</p>
+                  <p>• Perfect for complex printing requirements</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="pt-4">
             <Button 
               type="submit" 
               className="w-full md:w-auto bg-xerox-600 hover:bg-xerox-700"
-              disabled={calculatedCost === 0}
+              disabled={files.length === 0}
             >
               Submit Order
             </Button>
@@ -888,6 +963,7 @@ const getPrintTypeDisplayName = (type: string) => {
     case 'custom': return 'Custom (Mixed)';
     case 'softBinding': return 'Soft Binding';
     case 'spiralBinding': return 'Spiral Binding';
+    case 'customPrint': return 'Custom Print';
     default: return type;
   }
 };
