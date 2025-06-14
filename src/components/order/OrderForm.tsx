@@ -30,6 +30,7 @@ const orderSchema = z.object({
   fullName: z.string().min(2, { message: "Name must be at least 2 characters." }),
   phoneNumber: z.string().min(10, { message: "Please enter a valid phone number." }),
   printType: z.string(),
+  bindingColorType: z.string().optional(),
   copies: z.coerce.number().min(1),
   paperSize: z.string(),
   printSide: z.string(),
@@ -59,6 +60,7 @@ const OrderForm = () => {
       fullName: "",
       phoneNumber: "",
       printType: "blackAndWhite",
+      bindingColorType: "blackAndWhite",
       copies: 1,
       paperSize: "a4",
       printSide: "single",
@@ -113,11 +115,58 @@ const OrderForm = () => {
     const isDoubleSided = values.printSide === 'double';
     const copies = values.copies || 1;
     const printType = values.printType;
+    const bindingColorType = values.bindingColorType;
     
     let totalCost = 0;
     
     // Base printing cost calculation
-    if (values.printType === 'custom') {
+    if (bindingColorType === 'custom' && isBindingType) {
+      // Calculate cost for color pages in binding
+      if (values.colorPages) {
+        const colorPageRanges = values.colorPages.split(',').map(range => range.trim());
+        let colorPagesCount = 0;
+        
+        for (const range of colorPageRanges) {
+          if (range.includes('-')) {
+            const [start, end] = range.split('-').map(Number);
+            if (!isNaN(start) && !isNaN(end) && start <= end) {
+              colorPagesCount += (end - start + 1);
+            }
+          } else {
+            const page = Number(range);
+            if (!isNaN(page)) {
+              colorPagesCount += 1;
+            }
+          }
+        }
+        
+        const colorCostPerPage = isDoubleSided ? 13 : 8;
+        totalCost += colorPagesCount * colorCostPerPage;
+      }
+      
+      // Calculate cost for B&W pages in binding
+      if (values.bwPages) {
+        const bwPageRanges = values.bwPages.split(',').map(range => range.trim());
+        let bwPagesCount = 0;
+        
+        for (const range of bwPageRanges) {
+          if (range.includes('-')) {
+            const [start, end] = range.split('-').map(Number);
+            if (!isNaN(start) && !isNaN(end) && start <= end) {
+              bwPagesCount += (end - start + 1);
+            }
+          } else {
+            const page = Number(range);
+            if (!isNaN(page)) {
+              bwPagesCount += 1;
+            }
+          }
+        }
+        
+        const bwCostPerPage = isDoubleSided ? 1.6 : 1.5;
+        totalCost += bwPagesCount * bwCostPerPage;
+      }
+    } else if (values.printType === 'custom') {
       // Calculate cost for color pages
       if (values.colorPages) {
         const colorPageRanges = values.colorPages.split(',').map(range => range.trim());
@@ -164,9 +213,15 @@ const OrderForm = () => {
         totalCost += bwPagesCount * bwCostPerPage;
       }
     } else if (printType === 'softBinding' || printType === 'spiralBinding') {
-      // For binding types, calculate based on black and white printing
+      // For binding types, calculate based on binding color type
       let pagesCount = calculateSelectedPagesCount(values.selectedPages, totalPages);
-      let costPerPage = isDoubleSided ? 1.6 : 1.5;
+      let costPerPage;
+      
+      if (bindingColorType === 'color') {
+        costPerPage = isDoubleSided ? 13 : 8;
+      } else {
+        costPerPage = isDoubleSided ? 1.6 : 1.5;
+      }
       
       let effectivePages = pagesCount;
       if (isDoubleSided) {
@@ -267,7 +322,7 @@ const OrderForm = () => {
       return;
     }
 
-    if (data.printType === 'custom') {
+    if (data.printType === 'custom' || (isBindingType && data.bindingColorType === 'custom')) {
       if (!data.colorPages && !data.bwPages) {
         showToast({
           title: "Page selection required",
@@ -343,6 +398,22 @@ const OrderForm = () => {
         
         // Reset color/bw pages when switching print types
         if (printType !== 'custom') {
+          form.setValue('colorPages', '');
+          form.setValue('bwPages', '');
+        }
+        
+        // Reset binding color type when switching away from binding
+        if (printType !== 'softBinding' && printType !== 'spiralBinding') {
+          form.setValue('bindingColorType', 'blackAndWhite');
+        }
+      }
+      
+      if (name === 'bindingColorType') {
+        const bindingColorType = value.bindingColorType;
+        setIsCustomPrint(bindingColorType === 'custom');
+        
+        // Reset color/bw pages when switching binding color types
+        if (bindingColorType !== 'custom') {
           form.setValue('colorPages', '');
           form.setValue('bwPages', '');
         }
@@ -511,6 +582,38 @@ const OrderForm = () => {
                   </FormItem>
                 )}
               />
+
+              {/* Show binding color type selection when binding is selected */}
+              {isBindingType && (
+                <FormField
+                  control={form.control}
+                  name="bindingColorType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Binding Color Type</FormLabel>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          setIsCustomPrint(value === 'custom');
+                        }} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select color type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="blackAndWhite">Black & White</SelectItem>
+                          <SelectItem value="color">Color</SelectItem>
+                          <SelectItem value="custom">Custom (Mix Color & B/W)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               
               <FormField
                 control={form.control}
@@ -561,67 +664,6 @@ const OrderForm = () => {
                 )}
               />
             </div>
-
-            {/* Show color type selection for binding types */}
-            {isBindingType && (
-              <Card className="bg-blue-50 border-blue-200">
-                <CardHeader>
-                  <CardTitle className="text-lg">Binding Color Options</CardTitle>
-                  <CardDescription>
-                    Choose the color type for your binding order
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FormField
-                    control={form.control}
-                    name="printType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Color Type for Binding</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            // Keep the original binding type but update the color selection
-                            const currentPrintType = form.getValues('printType');
-                            if (currentPrintType === 'softBinding' || currentPrintType === 'spiralBinding') {
-                              // Create a composite value that includes both binding type and color type
-                              const bindingType = currentPrintType;
-                              if (value === 'custom') {
-                                setIsCustomPrint(true);
-                                field.onChange('custom');
-                              } else {
-                                setIsCustomPrint(false);
-                                field.onChange(value);
-                                // Reset color/bw pages when not custom
-                                form.setValue('colorPages', '');
-                                form.setValue('bwPages', '');
-                              }
-                              // Store the original binding type for cost calculation
-                              form.setValue('specialInstructions', 
-                                (form.getValues('specialInstructions') || '') + 
-                                `\nBinding Type: ${bindingType === 'softBinding' ? 'Soft Binding' : 'Spiral Binding'}`
-                              );
-                            }
-                          }}
-                          value={isCustomPrint ? 'custom' : (form.getValues('printType').includes('Binding') ? 'blackAndWhite' : form.getValues('printType'))}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select color type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="blackAndWhite">Black & White Only</SelectItem>
-                            <SelectItem value="color">Color Only</SelectItem>
-                            <SelectItem value="custom">Custom (Mix Color & B/W)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -795,16 +837,23 @@ const OrderForm = () => {
                   </p>
                 </div>
                 <div className="mt-2 text-sm text-gray-600">
-                  {!isCustomPrint && (
+                  {!isCustomPrint && !isBindingType && (
                     <>
                       <p>• Selected pages: {form.getValues('selectedPages')}</p>
                       <p>• {getPrintTypeDisplayName(form.getValues('printType'))} printing</p>
+                    </>
+                  )}
+                  {isBindingType && !isCustomPrint && (
+                    <>
+                      <p>• Selected pages: {form.getValues('selectedPages')}</p>
+                      <p>• {getPrintTypeDisplayName(form.getValues('printType'))} with {form.getValues('bindingColorType') === 'color' ? 'Color' : 'Black & White'} printing</p>
                     </>
                   )}
                   {isCustomPrint && (
                     <>
                       <p>• Color pages: {form.getValues('colorPages') || 'None'}</p>
                       <p>• B&W pages: {form.getValues('bwPages') || 'None'}</p>
+                      {isBindingType && <p>• {getPrintTypeDisplayName(form.getValues('printType'))}</p>}
                     </>
                   )}
                   <p>• {form.getValues('printSide') === 'double' ? 'Double' : 'Single'}-sided</p>
