@@ -9,9 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { fileStorage } from '@/services/fileStorage';
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type OrderFile = {
   name: string;
@@ -42,6 +43,8 @@ const OrdersList = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 10;
 
   useEffect(() => {
     const storedOrders = JSON.parse(localStorage.getItem('xeroxOrders') || '[]');
@@ -91,7 +94,7 @@ const OrdersList = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="outline\" className="bg-yellow-100 text-yellow-800 border-yellow-200">Pending</Badge>;
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">Pending</Badge>;
       case 'processing':
         return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">Processing</Badge>;
       case 'completed':
@@ -168,6 +171,28 @@ const OrdersList = () => {
     }
   };
 
+  // Pagination logic
+  const totalPages = Math.ceil(orders.length / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = orders.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
   return (
     <div>
       {orders.length === 0 ? (
@@ -175,50 +200,98 @@ const OrdersList = () => {
           <p className="text-gray-500">No orders found</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Print Type</TableHead>
-                <TableHead>Copies</TableHead>
-                <TableHead>Cost</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.orderId}>
-                  <TableCell>{order.orderId}</TableCell>
-                  <TableCell>{order.fullName}</TableCell>
-                  <TableCell>{formatDate(order.orderDate)}</TableCell>
-                  <TableCell>{getPrintTypeName(order.printType)}</TableCell>
-                  <TableCell>{order.copies}</TableCell>
-                  <TableCell>₹{order.totalCost?.toFixed(2) || '0.00'}</TableCell>
-                  <TableCell>{getStatusBadge(order.status)}</TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => viewOrderDetails(order)}
-                      className="mr-2"
-                    >
-                      View Details
-                    </Button>
-                  </TableCell>
+        <>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Print Type</TableHead>
+                  <TableHead>Copies</TableHead>
+                  <TableHead>Cost</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {currentOrders.map((order) => (
+                  <TableRow key={order.orderId}>
+                    <TableCell>{order.orderId}</TableCell>
+                    <TableCell>{order.fullName}</TableCell>
+                    <TableCell>{formatDate(order.orderDate)}</TableCell>
+                    <TableCell>{getPrintTypeName(order.printType)}</TableCell>
+                    <TableCell>{order.copies}</TableCell>
+                    <TableCell>₹{order.totalCost?.toFixed(2) || '0.00'}</TableCell>
+                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => viewOrderDetails(order)}
+                        className="mr-2"
+                      >
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-gray-500">
+                Showing {startIndex + 1} to {Math.min(endIndex, orders.length)} of {orders.length} orders
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => goToPage(page)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
       
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         {selectedOrder && (
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Order Details - {selectedOrder.orderId}</DialogTitle>
               <DialogDescription>
@@ -226,124 +299,126 @@ const OrdersList = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-medium text-gray-700">Customer Information</h3>
-                  <div className="mt-2 space-y-1">
-                    <p><span className="font-medium">Name:</span> {selectedOrder.fullName}</p>
-                    <p><span className="font-medium">Phone:</span> {selectedOrder.phoneNumber}</p>
+            <ScrollArea className="max-h-[70vh] pr-4">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="font-medium text-gray-700">Customer Information</h3>
+                    <div className="mt-2 space-y-1">
+                      <p><span className="font-medium">Name:</span> {selectedOrder.fullName}</p>
+                      <p><span className="font-medium">Phone:</span> {selectedOrder.phoneNumber}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium text-gray-700">Order Status</h3>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button 
+                        size="sm" 
+                        variant={selectedOrder.status === 'pending' ? 'default' : 'outline'}
+                        className={selectedOrder.status === 'pending' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                        onClick={() => handleStatusChange(selectedOrder.orderId, 'pending')}
+                      >
+                        Pending
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={selectedOrder.status === 'processing' ? 'default' : 'outline'}
+                        className={selectedOrder.status === 'processing' ? 'bg-blue-500 hover:bg-blue-600' : ''}
+                        onClick={() => handleStatusChange(selectedOrder.orderId, 'processing')}
+                      >
+                        Processing
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={selectedOrder.status === 'completed' ? 'default' : 'outline'}
+                        className={selectedOrder.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}
+                        onClick={() => handleStatusChange(selectedOrder.orderId, 'completed')}
+                      >
+                        Completed
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={selectedOrder.status === 'cancelled' ? 'default' : 'outline'}
+                        className={selectedOrder.status === 'cancelled' ? 'bg-red-500 hover:bg-red-600' : ''}
+                        onClick={() => handleStatusChange(selectedOrder.orderId, 'cancelled')}
+                      >
+                        Cancelled
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 
-                <div>
-                  <h3 className="font-medium text-gray-700">Order Status</h3>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button 
-                      size="sm" 
-                      variant={selectedOrder.status === 'pending' ? 'default' : 'outline'}
-                      className={selectedOrder.status === 'pending' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
-                      onClick={() => handleStatusChange(selectedOrder.orderId, 'pending')}
-                    >
-                      Pending
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant={selectedOrder.status === 'processing' ? 'default' : 'outline'}
-                      className={selectedOrder.status === 'processing' ? 'bg-blue-500 hover:bg-blue-600' : ''}
-                      onClick={() => handleStatusChange(selectedOrder.orderId, 'processing')}
-                    >
-                      Processing
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant={selectedOrder.status === 'completed' ? 'default' : 'outline'}
-                      className={selectedOrder.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}
-                      onClick={() => handleStatusChange(selectedOrder.orderId, 'completed')}
-                    >
-                      Completed
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant={selectedOrder.status === 'cancelled' ? 'default' : 'outline'}
-                      className={selectedOrder.status === 'cancelled' ? 'bg-red-500 hover:bg-red-600' : ''}
-                      onClick={() => handleStatusChange(selectedOrder.orderId, 'cancelled')}
-                    >
-                      Cancelled
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <h3 className="font-medium text-gray-700">Print Details</h3>
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Print Type</p>
-                    <p>{getPrintTypeName(selectedOrder.printType)}</p>
-                    {selectedOrder.printType === 'custom' && (
-                      <>
-                        <p className="mt-2 text-sm text-gray-500">Color Pages</p>
-                        <p>{selectedOrder.colorPages || 'None'}</p>
-                        <p className="mt-2 text-sm text-gray-500">B&W Pages</p>
-                        <p>{selectedOrder.bwPages || 'None'}</p>
-                      </>
-                    )}
-                    {selectedOrder.printType !== 'custom' && selectedOrder.selectedPages && (
-                      <>
-                        <p className="mt-2 text-sm text-gray-500">Selected Pages</p>
-                        <p>{selectedOrder.selectedPages}</p>
-                      </>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Print Side</p>
-                    <p>{selectedOrder.printSide === 'double' ? 'Double Sided' : 'Single Sided'}</p>
-                    <p className="mt-2 text-sm text-gray-500">Paper Size</p>
-                    <p>{getPaperSizeName(selectedOrder.paperSize)}</p>
-                    <p className="mt-2 text-sm text-gray-500">Copies</p>
-                    <p>{selectedOrder.copies}</p>
-                    <p className="mt-2 text-sm text-gray-500">Total Cost</p>
-                    <p className="font-semibold">₹{selectedOrder.totalCost?.toFixed(2) || '0.00'}</p>
-                  </div>
-                </div>
-              </div>
-              
-              {selectedOrder.specialInstructions && (
                 <div className="border-t pt-4">
-                  <h3 className="font-medium text-gray-700">Special Instructions</h3>
-                  <p className="mt-2 text-gray-800 whitespace-pre-line">{selectedOrder.specialInstructions}</p>
-                </div>
-              )}
-              
-              <div className="border-t pt-4">
-                <h3 className="font-medium text-gray-700">Files ({selectedOrder.files.length})</h3>
-                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
-                  {selectedOrder.files.map((file, index) => (
-                    <div key={index} className="file-item flex justify-between items-center">
-                      <div className="flex items-center">
-                        <FileText className="h-5 w-5 text-xerox-600 mr-3" />
-                        <div>
-                          <p className="text-sm font-medium truncate max-w-xs">{file.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {(file.size / 1024).toFixed(2)} KB
-                          </p>
-                        </div>
-                      </div>
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        className="ml-2 text-blue-600"
-                        onClick={() => handleFileDownload(file)}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
+                  <h3 className="font-medium text-gray-700">Print Details</h3>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Print Type</p>
+                      <p>{getPrintTypeName(selectedOrder.printType)}</p>
+                      {selectedOrder.printType === 'custom' && (
+                        <>
+                          <p className="mt-2 text-sm text-gray-500">Color Pages</p>
+                          <p>{selectedOrder.colorPages || 'None'}</p>
+                          <p className="mt-2 text-sm text-gray-500">B&W Pages</p>
+                          <p>{selectedOrder.bwPages || 'None'}</p>
+                        </>
+                      )}
+                      {selectedOrder.printType !== 'custom' && selectedOrder.selectedPages && (
+                        <>
+                          <p className="mt-2 text-sm text-gray-500">Selected Pages</p>
+                          <p>{selectedOrder.selectedPages}</p>
+                        </>
+                      )}
                     </div>
-                  ))}
+                    <div>
+                      <p className="text-sm text-gray-500">Print Side</p>
+                      <p>{selectedOrder.printSide === 'double' ? 'Double Sided' : 'Single Sided'}</p>
+                      <p className="mt-2 text-sm text-gray-500">Paper Size</p>
+                      <p>{getPaperSizeName(selectedOrder.paperSize)}</p>
+                      <p className="mt-2 text-sm text-gray-500">Copies</p>
+                      <p>{selectedOrder.copies}</p>
+                      <p className="mt-2 text-sm text-gray-500">Total Cost</p>
+                      <p className="font-semibold">₹{selectedOrder.totalCost?.toFixed(2) || '0.00'}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {selectedOrder.specialInstructions && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-medium text-gray-700">Special Instructions</h3>
+                    <p className="mt-2 text-gray-800 whitespace-pre-line">{selectedOrder.specialInstructions}</p>
+                  </div>
+                )}
+                
+                <div className="border-t pt-4">
+                  <h3 className="font-medium text-gray-700">Files ({selectedOrder.files.length})</h3>
+                  <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                    {selectedOrder.files.map((file, index) => (
+                      <div key={index} className="file-item flex justify-between items-center">
+                        <div className="flex items-center">
+                          <FileText className="h-5 w-5 text-xerox-600 mr-3" />
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-xs">{file.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {(file.size / 1024).toFixed(2)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          className="ml-2 text-blue-600"
+                          onClick={() => handleFileDownload(file)}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            </ScrollArea>
           </DialogContent>
         )}
       </Dialog>

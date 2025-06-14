@@ -59,11 +59,11 @@ const Home = () => {
                 Upload your files and we'll handle the rest.
               </p>
               <div className="mt-8">
-                <Button size="lg" className="bg-xerox-600 hover:bg-xerox-700">
-                  <Link to="/order" className="text-white">
+                <Link to="/order">
+                  <Button size="lg" className="bg-xerox-600 hover:bg-xerox-700 text-white">
                     Start your order
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </div>
             </div>
             <div className="flex justify-center">
@@ -110,11 +110,11 @@ const Home = () => {
               <p className="mt-2 text-gray-600">
                 High-quality printing for documents, reports, presentations, and more.
               </p>
-              <Button className="mt-4 w-full bg-xerox-600 hover:bg-xerox-700">
-                <Link to="/order" className="text-white">
+              <Link to="/order">
+                <Button className="mt-4 w-full bg-xerox-600 hover:bg-xerox-700 text-white">
                   Order Now
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
@@ -125,11 +125,11 @@ const Home = () => {
               <p className="mt-2 text-gray-600">
                 Professional spiral binding for documents, reports, and presentations.
               </p>
-              <Button className="mt-4 w-full bg-xerox-600 hover:bg-xerox-700">
-                <Link to="/order" className="text-white">
+              <Link to="/order">
+                <Button className="mt-4 w-full bg-xerox-600 hover:bg-xerox-700 text-white">
                   Order Now
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
@@ -140,11 +140,11 @@ const Home = () => {
               <p className="mt-2 text-gray-600">
                 Complete project binding solutions for academic and professional needs.
               </p>
-              <Button className="mt-4 w-full bg-xerox-600 hover:bg-xerox-700">
-                <Link to="/order" className="text-white">
+              <Link to="/order">
+                <Button className="mt-4 w-full bg-xerox-600 hover:bg-xerox-700 text-white">
                   Order Now
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
@@ -206,11 +206,11 @@ const Home = () => {
           </div>
 
           <div className="mt-12 text-center">
-            <Button size="lg" className="bg-xerox-600 hover:bg-xerox-700">
-              <Link to="/order" className="text-white">
+            <Link to="/order">
+              <Button size="lg" className="bg-xerox-600 hover:bg-xerox-700 text-white">
                 Place Your Order Now
-              </Link>
-            </Button>
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -223,11 +223,11 @@ const Home = () => {
             Fast, reliable printing services for your documents and files
           </p>
           <div className="mt-8">
-            <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-xerox-800">
-              <Link to="/order">
+            <Link to="/order">
+              <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-xerox-800">
                 Order Now
-              </Link>
-            </Button>
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
