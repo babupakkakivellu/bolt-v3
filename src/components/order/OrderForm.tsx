@@ -51,6 +51,7 @@ const OrderForm = () => {
   const [calculatedCost, setCalculatedCost] = useState(0);
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
   const [isCustomPrint, setIsCustomPrint] = useState(false);
+  const [isBindingType, setIsBindingType] = useState(false);
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
@@ -318,6 +319,7 @@ const OrderForm = () => {
     setCalculatedCost(0);
     setFilePreviewUrls([]);
     setIsCustomPrint(false);
+    setIsBindingType(false);
     form.reset();
   };
 
@@ -331,11 +333,19 @@ const OrderForm = () => {
     return () => subscription.unsubscribe();
   }, [form.watch, totalPages]);
 
-  // Watch print type for custom printing option
+  // Watch print type for custom printing option and binding types
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       if (name === 'printType') {
-        setIsCustomPrint(value.printType === 'custom');
+        const printType = value.printType;
+        setIsCustomPrint(printType === 'custom');
+        setIsBindingType(printType === 'softBinding' || printType === 'spiralBinding');
+        
+        // Reset color/bw pages when switching print types
+        if (printType !== 'custom') {
+          form.setValue('colorPages', '');
+          form.setValue('bwPages', '');
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -480,6 +490,7 @@ const OrderForm = () => {
                       onValueChange={(value) => {
                         field.onChange(value);
                         setIsCustomPrint(value === 'custom');
+                        setIsBindingType(value === 'softBinding' || value === 'spiralBinding');
                       }} 
                       defaultValue={field.value}
                     >
@@ -550,6 +561,67 @@ const OrderForm = () => {
                 )}
               />
             </div>
+
+            {/* Show color type selection for binding types */}
+            {isBindingType && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardHeader>
+                  <CardTitle className="text-lg">Binding Color Options</CardTitle>
+                  <CardDescription>
+                    Choose the color type for your binding order
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="printType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Color Type for Binding</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            // Keep the original binding type but update the color selection
+                            const currentPrintType = form.getValues('printType');
+                            if (currentPrintType === 'softBinding' || currentPrintType === 'spiralBinding') {
+                              // Create a composite value that includes both binding type and color type
+                              const bindingType = currentPrintType;
+                              if (value === 'custom') {
+                                setIsCustomPrint(true);
+                                field.onChange('custom');
+                              } else {
+                                setIsCustomPrint(false);
+                                field.onChange(value);
+                                // Reset color/bw pages when not custom
+                                form.setValue('colorPages', '');
+                                form.setValue('bwPages', '');
+                              }
+                              // Store the original binding type for cost calculation
+                              form.setValue('specialInstructions', 
+                                (form.getValues('specialInstructions') || '') + 
+                                `\nBinding Type: ${bindingType === 'softBinding' ? 'Soft Binding' : 'Spiral Binding'}`
+                              );
+                            }
+                          }}
+                          value={isCustomPrint ? 'custom' : (form.getValues('printType').includes('Binding') ? 'blackAndWhite' : form.getValues('printType'))}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select color type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="blackAndWhite">Black & White Only</SelectItem>
+                            <SelectItem value="color">Color Only</SelectItem>
+                            <SelectItem value="custom">Custom (Mix Color & B/W)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
