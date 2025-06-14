@@ -23,7 +23,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import FileUploader from './FileUploader';
-import { CheckCircle, Copy, Phone, Mail, Calculator, FileText } from "lucide-react";
+import { CheckCircle, Copy, Phone, Mail, Calculator, FileText, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 const orderSchema = z.object({
@@ -93,12 +93,29 @@ const OrderForm = () => {
     return selectedPagesCount;
   };
 
+  const calculateSpiralBindingCost = (totalPages: number): number => {
+    if (totalPages <= 50) {
+      return 25;
+    } else if (totalPages <= 70) {
+      return 30;
+    } else if (totalPages <= 90) {
+      return 35;
+    } else {
+      // For every 20 pages above 90, add 5 rupees
+      const extraPages = totalPages - 90;
+      const extraGroups = Math.ceil(extraPages / 20);
+      return 35 + (extraGroups * 5);
+    }
+  };
+
   const calculateCost = (values: OrderFormValues) => {
     const isDoubleSided = values.printSide === 'double';
     const copies = values.copies || 1;
+    const printType = values.printType;
     
     let totalCost = 0;
     
+    // Base printing cost calculation
     if (values.printType === 'custom') {
       // Calculate cost for color pages
       if (values.colorPages) {
@@ -145,7 +162,26 @@ const OrderForm = () => {
         const bwCostPerPage = isDoubleSided ? 1.6 : 1.5;
         totalCost += bwPagesCount * bwCostPerPage;
       }
+    } else if (printType === 'softBinding' || printType === 'spiralBinding') {
+      // For binding types, calculate based on black and white printing
+      let pagesCount = calculateSelectedPagesCount(values.selectedPages, totalPages);
+      let costPerPage = isDoubleSided ? 1.6 : 1.5;
+      
+      let effectivePages = pagesCount;
+      if (isDoubleSided) {
+        effectivePages = Math.ceil(pagesCount / 2);
+      }
+      
+      totalCost = effectivePages * costPerPage;
+      
+      // Add binding costs
+      if (printType === 'softBinding') {
+        totalCost += 25; // Fixed 25 rupees for soft binding
+      } else if (printType === 'spiralBinding') {
+        totalCost += calculateSpiralBindingCost(pagesCount);
+      }
     } else {
+      // Regular printing (blackAndWhite or color)
       const isColor = values.printType === 'color';
       let pagesCount = calculateSelectedPagesCount(values.selectedPages, totalPages);
       
@@ -340,6 +376,20 @@ const OrderForm = () => {
               </p>
             </div>
 
+            {/* Admin Contact Message */}
+            <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <Clock className="h-6 w-6 text-blue-600" />
+                <h4 className="font-semibold text-blue-900 text-lg">Quick Response Guarantee</h4>
+              </div>
+              <p className="text-blue-800 text-center text-lg font-medium">
+                Our Admin Will Contact You Within 10 Minutes
+              </p>
+              <p className="text-blue-700 text-center text-sm mt-2">
+                We'll call you to confirm your order details and provide pickup information.
+              </p>
+            </div>
+
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h4 className="font-medium text-blue-900 mb-3">What's Next?</h4>
               <ul className="space-y-2 text-sm text-blue-800">
@@ -442,6 +492,8 @@ const OrderForm = () => {
                         <SelectItem value="blackAndWhite">Black & White</SelectItem>
                         <SelectItem value="color">Color</SelectItem>
                         <SelectItem value="custom">Custom (Mix Color & B/W)</SelectItem>
+                        <SelectItem value="softBinding">Soft Binding</SelectItem>
+                        <SelectItem value="spiralBinding">Spiral Binding</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -674,7 +726,7 @@ const OrderForm = () => {
                   {!isCustomPrint && (
                     <>
                       <p>• Selected pages: {form.getValues('selectedPages')}</p>
-                      <p>• {form.getValues('printType') === 'color' ? 'Color' : 'Black & White'} printing</p>
+                      <p>• {getPrintTypeDisplayName(form.getValues('printType'))} printing</p>
                     </>
                   )}
                   {isCustomPrint && (
@@ -685,6 +737,9 @@ const OrderForm = () => {
                   )}
                   <p>• {form.getValues('printSide') === 'double' ? 'Double' : 'Single'}-sided</p>
                   <p>• {form.getValues('copies')} {form.getValues('copies') === 1 ? 'copy' : 'copies'}</p>
+                  {(form.getValues('printType') === 'softBinding' || form.getValues('printType') === 'spiralBinding') && (
+                    <p>• Includes binding charges</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -703,6 +758,17 @@ const OrderForm = () => {
       </Form>
     </div>
   );
+};
+
+const getPrintTypeDisplayName = (type: string) => {
+  switch (type) {
+    case 'blackAndWhite': return 'Black & White';
+    case 'color': return 'Color';
+    case 'custom': return 'Custom (Mixed)';
+    case 'softBinding': return 'Soft Binding';
+    case 'spiralBinding': return 'Spiral Binding';
+    default: return type;
+  }
 };
 
 export default OrderForm;

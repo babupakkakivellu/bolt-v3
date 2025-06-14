@@ -111,7 +111,8 @@ const OrdersList = () => {
       case 'blackAndWhite': return 'Black & White';
       case 'color': return 'Color';
       case 'custom': return 'Custom (Mixed)';
-      case 'premium': return 'Premium Color';
+      case 'softBinding': return 'Soft Binding';
+      case 'spiralBinding': return 'Spiral Binding';
       default: return type;
     }
   };
